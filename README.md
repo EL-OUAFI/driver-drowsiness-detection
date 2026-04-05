@@ -1,4 +1,3 @@
-Yes — the optical-flow baseline **does** have reported results: **Lucas-Kanade** reached **0.75 accuracy, 0.77 precision, and 0.70 recall**; **Lucas-Kanade Pyramid** reached **0.625 / 0.69 / 0.45**; **Horn-Schunck** reached **0.71 / 0.76 / 0.62**. The report also says **HOG-SVM outperformed optical flow** overall.  
 
 ````markdown
 # Driver Drowsiness Detection
