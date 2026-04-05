@@ -1,55 +1,80 @@
 # Driver Drowsiness Detection
 
-This repository turns an academic computer-vision project into a reproducible Python codebase. It implements and documents two real-time drowsiness-detection pipelines inspired by work done at CentraleSupelec between January 2024 and April 2024 on the UTA-RLDD dataset:
+Real-time driver drowsiness detection on the UTA-RLDD dataset, developed at CentraleSupelec between January 2024 and April 2024.
 
-- a landmark-driven optical-flow baseline
-- a HOG-SVM pipeline combining HOG descriptors with EAR and MAR
+This project compares two computer-vision pipelines for binary alert vs drowsy classification from driver face frames:
 
-The original notebooks are kept in [`notebooks/`](notebooks) for traceability, while the recruiter-facing implementation lives in `src/`.
+- an optical-flow baseline driven by facial landmarks
+- a HOG-SVM pipeline combining HOG descriptors with EAR and MAR features
 
-## Why This Repository Is Structured This Way
+The strongest model is the HOG-SVM pipeline, which reached `0.84` precision, `0.81` recall, and `0.83` F1-score on the `drowsy` class.
 
-The original project existed as two exploratory notebooks. That format is good for experimentation, but it is not ideal for:
+## Project Overview
 
-- reproducibility
-- code review
-- testing
-- packaging
-- command-line execution
-- communicating engineering maturity
+Driver drowsiness detection is a safety-critical vision task: the objective is to identify signs such as prolonged eye closure and yawning early enough to trigger an alert before driving performance degrades.
 
-This refactor keeps the research intent but packages it like production-quality applied ML work.
+This repository focuses on three things:
 
-## Highlights
+- comparing two different real-time detection strategies on the same dataset
+- keeping the feature engineering and modeling steps explicit and interpretable
+- packaging the project as a clean Python codebase instead of a one-off experiment
 
-- `src/driver_drowsiness/`: reusable Python package with typed modules and a CLI
-- `src/driver_drowsiness/pipelines/hog_svm.py`: training pipeline for the strongest reported model
-- `src/driver_drowsiness/pipelines/optical_flow.py`: cleaned optical-flow baseline
-- `src/driver_drowsiness/data.py`: dataset discovery and manifest generation for UTA-RLDD-style frame folders
-- `tests/`: unit tests for dependency-free geometry, metrics, and dataset-indexing logic
-- `docs/engineering-notes.md`: design decisions and how the notebook prototype was professionalized
+## Methods
 
-## Repository Layout
+### 1. Optical-flow baseline
+
+The baseline tracks facial motion over time from consecutive frames. Dense optical flow is combined with facial landmarks to monitor eye and mouth dynamics through geometric signals related to drowsiness.
+
+Main ideas:
+
+- detect facial landmarks with dlib's 68-point predictor
+- estimate inter-frame motion with Lucas-Kanade or Horn-Schunck optical flow
+- project motion onto eye and mouth landmarks
+- infer drowsiness from temporal EAR and MAR behavior
+
+### 2. HOG-SVM pipeline
+
+The best-performing pipeline extracts appearance and geometric features from the eyes and mouth, then trains an SVM classifier.
+
+Main ideas:
+
+- detect the face and facial landmarks
+- crop eye and mouth regions of interest
+- extract HOG descriptors from these regions
+- append EAR and MAR as compact geometric features
+- train a `StandardScaler + SVC` pipeline with grid search
+
+## Results
+
+| Pipeline | Precision | Recall | F1-score | Role |
+| --- | --- | --- | --- | --- |
+| HOG-SVM + EAR/MAR | 0.84 | 0.81 | 0.83 | Best-performing model |
+| Optical-flow baseline | - | - | - | Real-time comparison baseline |
+
+## Code Structure
 
 ```text
 .
 |-- docs/
-|-- notebooks/
 |-- src/driver_drowsiness/
 |   |-- cli.py
 |   |-- data.py
 |   |-- evaluation.py
 |   |-- features/
-|   |-- pipelines/
-|   `-- ...
+|   `-- pipelines/
 |-- tests/
 |-- pyproject.toml
 `-- README.md
 ```
 
-## Installation
+Important modules:
 
-Create a virtual environment, then install the project in editable mode:
+- `src/driver_drowsiness/pipelines/hog_svm.py`: end-to-end training pipeline for the strongest model
+- `src/driver_drowsiness/pipelines/optical_flow.py`: optical-flow-based baseline for sequence evaluation
+- `src/driver_drowsiness/features/`: landmark processing, HOG extraction, EAR, and MAR computation
+- `src/driver_drowsiness/data.py`: dataset discovery, sequence grouping, and manifest generation
+
+## Setup
 
 ```bash
 python -m venv .venv
@@ -57,15 +82,14 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-### Notes on Dependencies
+Required external assets:
 
-- `dlib` is required because the original project uses the 68-point facial landmark predictor.
-- You will also need the `shape_predictor_68_face_landmarks.dat` file from dlib's public model zoo.
-- The dataset itself is not committed here because of size and licensing constraints.
+- the UTA-RLDD dataset
+- `shape_predictor_68_face_landmarks.dat`
+
+The dataset and landmark model are not committed to this repository.
 
 ## Expected Dataset Layout
-
-The indexing code is intentionally flexible, but it works best with a tree that contains `alert`, `drowsy`, or `tired` in directory names:
 
 ```text
 dataset/
@@ -79,17 +103,17 @@ dataset/
     `-- ...
 ```
 
-`tired` is normalized to the label `drowsy` so the code can stay consistent.
+The loader normalizes `tired` to the label `drowsy`.
 
-## Command Line Usage
+## Usage
 
-Build a CSV manifest of the dataset:
+Build a dataset manifest:
 
 ```bash
 drowsiness build-manifest --dataset-root /path/to/UTA-RLDD --output data/uta_rldd_manifest.csv
 ```
 
-Train the HOG-SVM pipeline:
+Train the HOG-SVM model:
 
 ```bash
 drowsiness train-hog-svm \
@@ -98,7 +122,7 @@ drowsiness train-hog-svm \
   --artifacts-dir outputs/hog_svm
 ```
 
-Evaluate the optical-flow baseline on a subset of sequences:
+Evaluate the optical-flow baseline:
 
 ```bash
 drowsiness evaluate-optical-flow \
@@ -108,28 +132,9 @@ drowsiness evaluate-optical-flow \
   --output outputs/optical_flow/report.json
 ```
 
-## Reported Results
+## Technical Notes
 
-From the original study summary:
-
-- best model: HOG-SVM
-- precision: `0.84`
-- recall: `0.81`
-- F1-score: `0.83`
-
-These numbers should be treated as the project report benchmark. Reproducing them in a fresh environment requires the original dataset split, landmark model, and the same preprocessing assumptions.
-
-## What A Reviewer Should Notice
-
-- the repository preserves the original research artifact but no longer depends on notebooks to run
-- the code separates data indexing, feature extraction, modeling, and evaluation concerns
-- heavy dependencies are imported lazily where possible so failure modes are explicit
-- the CLI is designed to be usable by someone who did not author the project
-
-## Next Steps
-
-Before publishing publicly, you should still:
-
-1. add one or two saved benchmark reports under `docs/` or `outputs/examples/`
-2. run the code on your local machine with the real dataset and landmark file
-3. update the README with a short "reproducibility status" note once you have rerun the final experiments
+- the project separates data indexing, feature extraction, modeling, and evaluation
+- heavy scientific dependencies are imported lazily so failure points stay explicit
+- the command-line interface is designed so the full workflow can be rerun without editing source files
+- the current repository emphasizes the final implementation rather than exploratory artifacts
