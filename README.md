@@ -1,5 +1,4 @@
 
-````markdown
 # Driver Drowsiness Detection
 
 Real-time driver drowsiness detection on the UTA-RLDD dataset.
@@ -86,7 +85,7 @@ Among the optical-flow variants, **Lucas-Kanade** achieved the strongest results
 ├── tests/
 ├── pyproject.toml
 └── README.md
-````
+
 
 Important modules:
 
