@@ -1,100 +1,79 @@
-
 # Driver Drowsiness Detection
 
-Real-time driver drowsiness detection on the UTA-RLDD dataset.
+Real-time driver drowsiness detection on the UTA-RLDD dataset, developed at CentraleSupelec between January 2024 and April 2024.
 
-This repository implements and compares two computer vision pipelines for binary **alert vs drowsy** classification from driver face frames:
+This project compares two computer-vision pipelines for binary alert vs drowsy classification from driver face frames:
 
-- a landmark-based optical-flow pipeline
+- an optical-flow baseline driven by facial landmarks
 - a HOG-SVM pipeline combining HOG descriptors with EAR and MAR features
 
-The strongest model is the **HOG-SVM** pipeline, which reached **0.84 precision**, **0.81 recall**, and **0.83 F1-score** on the **drowsy** class.
+The strongest model is the HOG-SVM pipeline, which reached `0.84` precision, `0.81` recall, and `0.83` F1-score on the `drowsy` class.
 
-## Overview
+## Project Overview
 
-Driver drowsiness detection is a safety-critical computer vision task. The goal is to detect visual signs such as prolonged eye closure, yawning, and reduced facial activity early enough to trigger an alert before driving performance degrades.
+Driver drowsiness detection is a safety-critical vision task: the objective is to identify signs such as prolonged eye closure and yawning early enough to trigger an alert before driving performance degrades.
 
-This repository focuses on:
+This repository focuses on three things:
 
-- comparing two lightweight real-time detection strategies on the same dataset
-- keeping feature extraction and modeling explicit and interpretable
-- providing a clean, reusable Python codebase for training and evaluation
+- comparing two different real-time detection strategies on the same dataset
+- keeping the feature engineering and modeling steps explicit and interpretable
+- packaging the project as a clean Python codebase instead of a one-off experiment
 
-## Implemented Pipelines
+## Methods
 
-### 1. Optical-Flow Pipeline
+### 1. Optical-flow baseline
 
-A landmark-based pipeline that analyzes facial motion across consecutive frames.
+The baseline tracks facial motion over time from consecutive frames. Dense optical flow is combined with facial landmarks to monitor eye and mouth dynamics through geometric signals related to drowsiness.
 
-Main components:
+Main ideas:
 
-- facial landmark detection with dlib's 68-point predictor
-- optical-flow estimation between consecutive frames
-- motion analysis on eye and mouth regions
-- temporal reasoning through EAR and MAR dynamics
+- detect facial landmarks with dlib's 68-point predictor
+- estimate inter-frame motion with Lucas-Kanade or Horn-Schunck optical flow
+- project motion onto eye and mouth landmarks
+- infer drowsiness from temporal EAR and MAR behavior
 
-Implemented variants:
+### 2. HOG-SVM pipeline
 
-- Lucas-Kanade
-- Lucas-Kanade Pyramid
-- Horn-Schunck
+The best-performing pipeline extracts appearance and geometric features from the eyes and mouth, then trains an SVM classifier.
 
-### 2. HOG-SVM Pipeline
+Main ideas:
 
-The best-performing pipeline in this repository. It combines appearance and geometric features for binary classification.
-
-Main components:
-
-- facial landmark detection
-- extraction of eye and mouth regions of interest
-- HOG feature extraction
-- Eye Aspect Ratio (EAR)
-- Mouth Aspect Ratio (MAR)
-- `StandardScaler + SVC` classification pipeline
+- detect the face and facial landmarks
+- crop eye and mouth regions of interest
+- extract HOG descriptors from these regions
+- append EAR and MAR as compact geometric features
+- train a `StandardScaler + SVC` pipeline with grid search
 
 ## Results
 
-### HOG-SVM
+| Pipeline | Precision | Recall | F1-score | Role |
+| --- | --- | --- | --- | --- |
+| HOG-SVM + EAR/MAR | 0.84 | 0.81 | 0.83 | Best-performing model |
+| Optical-flow baseline | - | - | - | Real-time comparison baseline |
 
-- **Precision:** 0.84
-- **Recall:** 0.81
-- **F1-score:** 0.83
-- **Role:** best-performing model
-
-### Optical Flow
-
-| Method | Accuracy | Precision | Recall |
-| --- | --- | --- | --- |
-| Lucas-Kanade | 0.75 | 0.77 | 0.70 |
-| Lucas-Kanade Pyramid | 0.625 | 0.69 | 0.45 |
-| Horn-Schunck | 0.71 | 0.76 | 0.62 |
-
-Among the optical-flow variants, **Lucas-Kanade** achieved the strongest results.
-
-## Repository Structure
+## Code Structure
 
 ```text
 .
-├── docs/
-├── src/driver_drowsiness/
-│   ├── cli.py
-│   ├── data.py
-│   ├── evaluation.py
-│   ├── features/
-│   └── pipelines/
-├── tests/
-├── pyproject.toml
-└── README.md
-
+|-- src/driver_drowsiness/
+|   |-- cli.py
+|   |-- data.py
+|   |-- evaluation.py
+|   |-- features/
+|   `-- pipelines/
+|-- tests/
+|-- pyproject.toml
+`-- README.md
+```
 
 Important modules:
 
-* `src/driver_drowsiness/pipelines/hog_svm.py`: end-to-end training pipeline for the strongest model
-* `src/driver_drowsiness/pipelines/optical_flow.py`: optical-flow-based pipeline for sequence evaluation
-* `src/driver_drowsiness/features/`: landmark processing, HOG extraction, EAR, and MAR computation
-* `src/driver_drowsiness/data.py`: dataset discovery, sequence grouping, and manifest generation
+- `src/driver_drowsiness/pipelines/hog_svm.py`: end-to-end training pipeline for the strongest model
+- `src/driver_drowsiness/pipelines/optical_flow.py`: optical-flow-based baseline for sequence evaluation
+- `src/driver_drowsiness/features/`: landmark processing, HOG extraction, EAR, and MAR computation
+- `src/driver_drowsiness/data.py`: dataset discovery, sequence grouping, and manifest generation
 
-## Installation
+## Setup
 
 ```bash
 python -m venv .venv
@@ -102,28 +81,33 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-## Dependencies
+## Validation
 
-This project requires:
+Run the lightweight unit tests:
 
-* the UTA-RLDD dataset
-* `dlib`
-* `shape_predictor_68_face_landmarks.dat`
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -q
+```
 
-The dataset and pretrained landmark model are not included in this repository.
+Required external assets:
+
+- the UTA-RLDD dataset
+- `shape_predictor_68_face_landmarks.dat`
+
+The dataset and landmark model are not committed to this repository.
 
 ## Expected Dataset Layout
 
 ```text
 dataset/
-├── alert/
-│   ├── 0001_01.jpg
-│   ├── 0001_02.jpg
-│   └── ...
-└── tired/
-    ├── 0137_01.jpg
-    ├── 0137_02.jpg
-    └── ...
+|-- alert/
+|   |-- 0001_01.jpg
+|   |-- 0001_02.jpg
+|   `-- ...
+`-- tired/
+    |-- 0137_01.jpg
+    |-- 0137_02.jpg
+    `-- ...
 ```
 
 The loader normalizes `tired` to the label `drowsy`.
@@ -145,7 +129,7 @@ drowsiness train-hog-svm \
   --artifacts-dir outputs/hog_svm
 ```
 
-Evaluate the optical-flow pipeline:
+Evaluate the optical-flow baseline:
 
 ```bash
 drowsiness evaluate-optical-flow \
@@ -155,12 +139,9 @@ drowsiness evaluate-optical-flow \
   --output outputs/optical_flow/report.json
 ```
 
-## Notes
+## Technical Notes
 
-* the repository separates data indexing, feature extraction, modeling, and evaluation
-* the command-line interface is designed so the workflow can be rerun without editing source files
-* `src/` contains the reusable implementation
-* `tests/` contains validation for dependency-light logic
-
-```
-```
+- the project separates data indexing, feature extraction, modeling, and evaluation
+- heavy scientific dependencies are imported lazily so failure points stay explicit
+- the command-line interface is designed so the full workflow can be rerun without editing source files
+- the current repository emphasizes the final implementation rather than exploratory artifacts
